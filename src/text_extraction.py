@@ -4,76 +4,65 @@ import re
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.linear_model import LogisticRegression
 from sklearn.model_selection import train_test_split
+from sklearn.metrics import classification_report
 from sklearn.metrics import f1_score
 import pandas as pd
-# If you are on Windows, provide the path to the tesseract executable
-# Update this path with your local installation of tesseract
-pytesseract.pytesseract.tesseract_cmd = r"E:/program/tesseract.exe"
+from sklearn.metrics import confusion_matrix
+import seaborn as sns
+import matplotlib.pyplot as plt
+import numpy as np
 
-def extract_text_from_image(image_path):
-    # Read the image using OpenCV
-    img = cv2.imread(image_path)
+# Load the extracted text dataset
+df_extracted = pd.read_csv('C:/Users/PRITAM/Downloads/66e31d6ee96cd_student_resource_3/student_resource 3/dataset/extracted_texts.csv')
 
-    # Convert the image to RGB format (if needed)
-    img_rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+# Handle missing values by dropping rows with NaN in the 'text' column
+df_extracted = df_extracted.dropna(subset=['text'])
 
-    # Use Tesseract to extract text from the image
-    extracted_text = pytesseract.image_to_string(img_rgb)
+# Step 1: Vectorize the text using TF-IDF
+vectorizer = TfidfVectorizer(max_features=5000)
+X = vectorizer.fit_transform(df_extracted['text'])
 
-    return extracted_text
+# Step 2: Set the target variable
+y = df_extracted['label']
 
+# Train/test split
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
 
-def clean_text(text):
-    # Remove unwanted characters and numbers that are not relevant
-    cleaned_text = re.sub(r'[^a-zA-Z0-9\s]', '', text)  # Keep only alphanumeric and spaces
-    cleaned_text = re.sub(r'\s+', ' ', cleaned_text)  # Remove extra spaces
-    cleaned_text = cleaned_text.strip().lower()  # Convert to lowercase
-    return cleaned_text
-
-def convert_text_to_features(text_data):
-    # Initialize the TF-IDF vectorizer
-    vectorizer = TfidfVectorizer()
-
-    # Fit and transform the text data into numerical features
-    text_features = vectorizer.fit_transform([text_data])
-
-    return text_features, vectorizer
-
-# Test the function
-image_path = "C:/Users/PRITAM/Downloads/66e31d6ee96cd_student_resource_3/student_resource 3/dataset/downloaded_image.jpg"  # Change this if needed
-extracted_text = extract_text_from_image(image_path)
-
-cleaned_text = clean_text(extracted_text)
-print("Cleaned Text:")
-print(cleaned_text)
-
-text_features, vectorizer = convert_text_to_features(cleaned_text)
-print("Numerical Features (TF-IDF):")
-print(text_features.toarray())
-
-
-
-# Load the dataset
-train_df = pd.read_csv("C:/Users/PRITAM/Downloads/66e31d6ee96cd_student_resource_3/student_resource 3/dataset/train1.csv")
-
-# Extract features and labels
-X = train_df['entity_name']  # Feature (Text Data)
-y = train_df['entity_value']  # Labels (Target Variable)
-
-# Clean and convert the text data to numerical features using the TF-IDF vectorizer
-X_cleaned = [clean_text(text) for text in X]
-X_features = vectorizer.transform(X_cleaned)
-
-# Split the data into training and testing sets
-X_train, X_test, y_train, y_test = train_test_split(X_features, y, test_size=0.2, random_state=42)
-
-# Train the Logistic Regression model
-model = LogisticRegression()
+# Model training with class weights to handle imbalance
+model = LogisticRegression(max_iter=1000, class_weight='balanced')
 model.fit(X_train, y_train)
 
-# Make predictions
+# Evaluate the model
 y_pred = model.predict(X_test)
 
-# Calculate F1 Score
-f1 = f1_score(y_test, y_pred, average='weighted')
-print(f"F1 Score: {f1}")
+# Classification report with zero_division set to avoid warnings
+print(classification_report(y_test, y_pred, zero_division=0))
+
+# Load the test dataset
+# test_df = pd.read_csv("C:/Users/PRITAM/Downloads/66e31d6ee96cd_student_resource_3/student_resource 3/dataset/test1.csv")
+
+# Transform the test data using the same vectorizer
+X_test = vectorizer.transform(df_extracted['text'])
+
+# Make predictions
+predictions = model.predict(X_test)
+
+# Assuming sample_test_out.csv gives you the format
+sample_out = pd.read_csv("C:/Users/PRITAM/Downloads/66e31d6ee96cd_student_resource_3/student_resource 3/dataset/sample_test_out.csv")
+
+# Create a new DataFrame with the predictions
+predictions_df = pd.DataFrame(predictions, columns=['prediction'])
+
+# Make sure the length of the predictions matches the length of the index in the sample_out DataFrame
+if len(predictions) < len(sample_out):
+    # Add empty rows to the predictions_df to match the length of the sample_out DataFrame
+    predictions_df = pd.concat([predictions_df, pd.DataFrame({'prediction': [None]*(len(sample_out) - len(predictions_df))})], ignore_index=True)
+elif len(predictions) > len(sample_out):
+    # Remove excess rows from the predictions_df to match the length of the sample_out DataFrame
+    predictions_df = predictions_df.head(len(sample_out))
+
+# Assign the predictions to the entity_value column
+sample_out['prediction'] = predictions_df['prediction']
+
+# Save the formatted file as test_out.csv
+sample_out.to_csv("test_out.csv", index=False)
