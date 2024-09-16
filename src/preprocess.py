@@ -57,7 +57,7 @@ def save_preprocessed_image(image, output_path):
 
 if __name__ == "__main__":
     # Example: Download an image, preprocess it, and save it
-    df = pd.read_csv('C:/Users/PRITAM/Downloads/66e31d6ee96cd_student_resource_3/student_resource 3/dataset/train1.csv')
+    df = pd.read_csv('C:/Users/PRITAM/Downloads/66e31d6ee96cd_student_resource_3/student_resource 3/dataset/train.csv')
     
     extracted_texts = []
     labels = []
